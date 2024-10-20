@@ -108,7 +108,3 @@ async def process_photo(message: types.Message, state: FSMContext):
 
     # Holatni yakunlash
     await state.finish()
-
-
-# Middleware ni qo‘llash
-# dp.middleware.setup(TimeoutMiddleware())
