@@ -1,7 +1,10 @@
 import os
+import time
+
 import requests
 from aiogram import types
 from loader import dp, bot
+from datetime import datetime
 from dotenv import load_dotenv
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.middlewares import BaseMiddleware
@@ -68,7 +71,7 @@ async def process_book_id(message: types.Message, state: FSMContext):
 
 @dp.message_handler(content_types=['photo'], state=CheckSheetForm.photo)
 async def process_photo(message: types.Message, state: FSMContext):
-    await message.answer('♻️ Tekshirilmoqda...')
+    checking_msg = await message.answer('♻️ Tekshirilmoqda...')
 
     # Kitob ID'ni olish
     async with state.proxy() as data:
@@ -98,12 +101,52 @@ async def process_photo(message: types.Message, state: FSMContext):
     os.remove("check_photo.jpg")
 
     if response.status_code == 200:
-        await message.answer("✅ Muvaffaqiyatli tekshirildi!")
+        success_msg = await message.answer("✅ Muvaffaqiyatli tekshirildi!")
+        time.sleep(2)
+        await checking_msg.delete()
+        await success_msg.delete()
+        send_file_msg = await message.answer("📥 Fayl yuklanmoqda...")
+
+        # Yuklanadigan faylni API'dan olish
+        url = os.getenv('API_CHECK_ABT')
+        r = requests.get(url, stream=True)
+
+        if r.status_code == 200:
+            # Javob sarlavhalaridan Content-Disposition ni olish
+            content_disposition = r.headers.get('Content-Disposition')
+            if content_disposition:
+                file_name = content_disposition.split('filename=')[-1].strip('"')
+            else:
+                file_name = 'downloaded_file.pdf'
+
+            # Faylni saqlash uchun katalogni tekshirish va yaratish
+            directory = os.path.dirname(file_name)
+            if directory and not os.path.exists(directory):
+                os.makedirs(directory)
+
+            # Faylni saqlash
+            with open(file_name, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            # Xabarlarni o'chirish
+            await send_file_msg.delete()
+
+            # Faylni foydalanuvchiga yuborish
+            await message.answer_document(open(file_name, 'rb'))
+
+            # Faylni o'chirish
+            os.remove(file_name)
+
+        else:
+            await message.answer("Faylni yuklab olishda xatolik yuz berdi.")
     else:
-        msg = response.json().get('message', 'Xatolik yuz berdi')
+        msg = response.json()['message']
         if len(msg) > 40:
+            await checking_msg.delete()
             await message.answer(f'🚫 Error: {msg}\n\n/qolda_tekshir')
         else:
+            await checking_msg.delete()
             await message.answer(f'🚫 Error: {msg}')
 
     # Holatni yakunlash
