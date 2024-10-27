@@ -1,10 +1,8 @@
 import os
 import time
-
 import requests
 from aiogram import types
 from loader import dp, bot
-from datetime import datetime
 from dotenv import load_dotenv
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.middlewares import BaseMiddleware
@@ -15,7 +13,9 @@ load_dotenv()
 
 API_TOKEN = os.getenv("BOT_TOKEN")
 API_ENDPOINT = os.getenv("API_ABITURIYENT")
-
+USER_INFO_DATA = os.getenv('API_BOT_USER_INFO')
+PATCH_URL = os.getenv('API_BOT_USER_PATCH')
+CHECK_ABT_URL = os.getenv('API_CHECK_ABT')
 
 # FSM uchun holatlar
 class CheckSheetForm(StatesGroup):
@@ -52,8 +52,18 @@ class TimeoutMiddleware(BaseMiddleware):
 
 @dp.message_handler(commands=['qolda_tekshir'])
 async def start_manual_check(message: types.Message):
-    await message.answer("Iltimos, kitob raqamini kiriting:", reply_markup=cancel_button)
-    await CheckSheetForm.book_id.set()
+
+    url_data = requests.get(f'{USER_INFO_DATA}{message.from_user.id}')
+
+    if url_data.status_code == 200:
+        limit = url_data.json()['limit']
+        if limit > 0:
+            await message.answer("Iltimos, kitob raqamini kiriting:", reply_markup=cancel_button)
+            await CheckSheetForm.book_id.set()
+        else:
+            await message.answer("Sizda yetarlicha limit mavjud emas!\n\n/myself")
+    else:
+        await message.answer("Server is not running yet!")
 
 
 @dp.message_handler(state=CheckSheetForm.book_id)
@@ -108,8 +118,7 @@ async def process_photo(message: types.Message, state: FSMContext):
         send_file_msg = await message.answer("📥 Fayl yuklanmoqda...")
 
         # Yuklanadigan faylni API'dan olish
-        url = os.getenv('API_CHECK_ABT')
-        r = requests.get(url, stream=True)
+        r = requests.get(CHECK_ABT_URL, stream=True)
 
         if r.status_code == 200:
             # Javob sarlavhalaridan Content-Disposition ni olish
@@ -134,6 +143,15 @@ async def process_photo(message: types.Message, state: FSMContext):
 
             # Faylni foydalanuvchiga yuborish
             await message.answer_document(open(file_name, 'rb'))
+
+            url_data = requests.get(f'{USER_INFO_DATA}{message.from_user.id}')
+
+            limit = url_data.json()['limit'] - 1
+            checked_file = url_data.json()['checked_file'] + 1
+
+            url_patch = os.getenv('API_BOT_USER_PATCH')
+            patch_data = requests.patch(f'{url_patch}{message.from_user.id}', data={'limit': limit,
+                                                                                    'checked_file': checked_file})
 
             # Faylni o'chirish
             os.remove(file_name)

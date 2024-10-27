@@ -1,6 +1,5 @@
 import os
 import time
-
 import requests
 from aiogram import types
 from loader import dp, bot
@@ -12,6 +11,12 @@ load_dotenv()
 API_TOKEN = os.getenv("BOT_TOKEN")
 API_ENDPOINT_ABITURIYENT = os.getenv("API_ABITURIYENT")
 API_ENDPOINT_PREZIDENT = os.getenv("API_PREZIDENT_MAKTABI")
+
+API_CHECK_ABT_URL = os.getenv('API_CHECK_ABT')
+API_CHECK_PM_URL = os.getenv('API_CHECK_PM')
+
+USER_INFO_DATA = os.getenv('API_BOT_USER_INFO')
+PATCH_URL = os.getenv('API_BOT_USER_PATCH')
 
 user_context = {}
 
@@ -52,12 +57,20 @@ async def handle_photo(message: types.Message):
     user_id = message.from_user.id
     context = user_context.get(user_id)
 
-    if context == 'abituriyent':
-        await process_image(message, API_ENDPOINT_ABITURIYENT)
-    elif context == 'prezident_maktabi':
-        await process_image(message, API_ENDPOINT_PREZIDENT)
+    url_data = requests.get(f'{USER_INFO_DATA}{user_id}')
+    if url_data.status_code == 200:
+        limit = url_data.json()['limit']
+        if limit > 0:
+            if context == 'abituriyent':
+                await process_image(message, API_ENDPOINT_ABITURIYENT)
+            elif context == 'prezident_maktabi':
+                await process_image(message, API_ENDPOINT_PREZIDENT)
+            else:
+                await message.answer("Iltimos, avval bo'limni tanlang 👇👇👇", reply_markup=main_menu_keyboard)
+        else:
+            await message.answer('Sizda yetarlicha limit mavjud emas!\n\n/myself')
     else:
-        await message.answer("Iltimos, avval bo'limni tanlang 👇👇👇", reply_markup=main_menu_keyboard)
+        await message.answer('Server is not running yet!')
 
 
 # Umumiy rasmni qayta ishlash funksiyasi
@@ -85,12 +98,13 @@ async def process_image(message: types.Message, api_endpoint):
                 'user': 122,
                 'book_id': '',
             }
-            url = os.getenv('API_CHECK_ABT')
+            url = API_CHECK_ABT_URL
         else:
             data = {
                 'user': 122,
             }
-            url = os.getenv('API_CHECK_PM')
+            url = API_CHECK_PM_URL
+
         response = requests.post(api_endpoint, files=files, data=data)
     os.remove("check_photo.jpg")
 
@@ -127,6 +141,15 @@ async def process_image(message: types.Message, api_endpoint):
 
             # Faylni foydalanuvchiga yuborish
             await message.answer_document(open(file_name, 'rb'))
+
+            url_data = requests.get(f'{USER_INFO_DATA}{message.from_user.id}')
+
+            limit = url_data.json()['limit'] - 1
+            checked_file = url_data.json()['checked_file'] + 1
+
+            url_patch = os.getenv('API_BOT_USER_PATCH')
+            patch_data = requests.patch(f'{url_patch}{message.from_user.id}', data={'limit': limit,
+                                                                                    'checked_file': checked_file})
 
             # Faylni o'chirish
             os.remove(file_name)
