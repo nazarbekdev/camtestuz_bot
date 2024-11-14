@@ -8,6 +8,8 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.middlewares import BaseMiddleware
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from utils.misc import subscription
+from data.config import CHANNEL
 
 load_dotenv()
 
@@ -50,20 +52,46 @@ class TimeoutMiddleware(BaseMiddleware):
                 await update.message.reply("Oldingi jarayon tugatildi, yangi komandani boshlang.")
 
 
+# Obunani tekshirish uchun tugma yaratish
+check_subscription_keyboard = InlineKeyboardMarkup().add(
+    InlineKeyboardButton("Obunani tekshirish", callback_data="check_subs")
+)
+
+
+# Foydalanuvchining obuna ekanligini tekshiradigan funksiya
+async def is_user_subscribed(user_id):
+    for channel in CHANNEL:
+        is_subscribed = await subscription.check(user_id=user_id, channel=channel)
+        if not is_subscribed:
+            return False
+    return True
+
+
 @dp.message_handler(commands=['qolda_tekshir'])
 async def start_manual_check(message: types.Message):
+    user_id = message.from_user.id
 
-    url_data = requests.get(f'{USER_INFO_DATA}{message.from_user.id}')
+    # Check if the user is subscribed to all required channels
+    if not await is_user_subscribed(user_id):
+        await message.answer("❗️Botdan foydalanish uchun barcha kanallarga obuna bo'lishingiz kerak!",
+                             reply_markup=check_subscription_keyboard)
+        return
 
-    if url_data.status_code == 200:
-        limit = url_data.json()['limit']
-        if limit > 0:
-            await message.answer("Iltimos, kitob raqamini kiriting:", reply_markup=cancel_button)
-            await CheckSheetForm.book_id.set()
-        else:
-            await message.answer("Sizda yetarlicha limit mavjud emas!\n\n/myself")
-    else:
+    # Fetch user data and check server status
+    response = requests.get(f'{USER_INFO_DATA}{user_id}')
+    if response.status_code != 200:
         await message.answer("Server is not running yet!")
+        return
+
+    # Extract limit data and proceed if sufficient limit is available
+    user_data = response.json()
+    limit = user_data.get('limit', 0)
+
+    if limit > 0:
+        await message.answer("Iltimos, kitob raqamini kiriting:", reply_markup=cancel_button)
+        await CheckSheetForm.book_id.set()
+    else:
+        await message.answer("Sizda yetarlicha limit mavjud emas!\n\n/myself")
 
 
 @dp.message_handler(state=CheckSheetForm.book_id)

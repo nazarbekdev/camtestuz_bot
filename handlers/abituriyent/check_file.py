@@ -5,6 +5,9 @@ from aiogram import types
 from loader import dp, bot
 from dotenv import load_dotenv
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from utils.misc import subscription
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from data.config import CHANNEL
 
 load_dotenv()
 
@@ -30,25 +33,48 @@ back_button_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 back_button_keyboard.add(KeyboardButton("⬅️ Ortga qaytish"))
 
 
-# Abituriyent uchun bo'limni tanlash
-@dp.message_handler(lambda message: message.text == "👨🏻‍🎓 Abituriyent")
-async def process_abituriyent(message: types.Message):
-    await message.answer("👨🏻‍🎓 Abituriyent bo'limidasiz!\n\n🏞️ Rasm yuboring!!!", reply_markup=back_button_keyboard)
-    user_context[message.from_user.id] = 'abituriyent'
-
-
-# Prezident Maktabi uchun bo'limni tanlash
-@dp.message_handler(lambda message: message.text == "🤵‍♂️ Prezident Maktabi")
-async def process_prezident_maktabi(message: types.Message):
-    await message.answer("🤵‍♂️ Prezident Maktabi bo'limidasiz!\n\n🎑 Rasm yuboring.", reply_markup=back_button_keyboard)
-    user_context[message.from_user.id] = 'prezident_maktabi'
-
-
 # Ortga qaytish tugmasi ishlashi
 @dp.message_handler(lambda message: message.text == "⬅️ Ortga qaytish")
 async def process_back_button(message: types.Message):
     await message.answer("🔙 Asosiy menyuga qaytdingiz. Bo'lim tanlang:", reply_markup=main_menu_keyboard)
     user_context.pop(message.from_user.id, None)
+
+
+# Obunani tekshirish uchun tugma yaratish
+check_subscription_keyboard = InlineKeyboardMarkup().add(
+    InlineKeyboardButton("Obunani tekshirish", callback_data="check_subs")
+)
+
+
+# Foydalanuvchining obuna ekanligini tekshiradigan funksiya
+async def is_user_subscribed(user_id):
+    for channel in CHANNEL:
+        is_subscribed = await subscription.check(user_id=user_id, channel=channel)
+        if not is_subscribed:
+            return False
+    return True
+
+
+# Abituriyent bo'limi uchun obunani tekshirish
+@dp.message_handler(lambda message: message.text == "👨🏻‍🎓 Abituriyent")
+async def process_abituriyent(message: types.Message):
+    if await is_user_subscribed(message.from_user.id):
+        await message.answer("👨🏻‍🎓 Abituriyent bo'limidasiz!\n\n🏞️ Rasm yuboring!!!", reply_markup=back_button_keyboard)
+        user_context[message.from_user.id] = 'abituriyent'
+    else:
+        await message.answer("❗️Botdan foydalanish uchun barcha kanallarga obuna bo'lishingiz kerak!",
+                             reply_markup=check_subscription_keyboard)
+
+
+# Prezident Maktabi bo'limi uchun obunani tekshirish
+@dp.message_handler(lambda message: message.text == "🤵‍♂️ Prezident Maktabi")
+async def process_prezident_maktabi(message: types.Message):
+    if await is_user_subscribed(message.from_user.id):
+        await message.answer("🤵‍♂️ Prezident Maktabi bo'limidasiz!\n\n🎑 Rasm yuboring.", reply_markup=back_button_keyboard)
+        user_context[message.from_user.id] = 'prezident_maktabi'
+    else:
+        await message.answer("❗️Botdan foydalanish uchun barcha kanallarga obuna bo'lishingiz kerak!",
+                             reply_markup=check_subscription_keyboard)
 
 
 # Rasmni qayta ishlash
