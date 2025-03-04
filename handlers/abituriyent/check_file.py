@@ -121,13 +121,13 @@ async def process_image(message: types.Message, api_endpoint):
         user_id = message.from_user.id
         if user_context.get(user_id) == 'abituriyent':
             data = {
-                'user': 122,
+                'user': 12,
                 'book_id': '',
             }
             url = API_CHECK_ABT_URL
         else:
             data = {
-                'user': 122,
+                'user': 12,
             }
             url = API_CHECK_PM_URL
 
@@ -143,7 +143,6 @@ async def process_image(message: types.Message, api_endpoint):
 
         # Yuklanadigan faylni API'dan olish
         r = requests.get(url, stream=True)
-
         if r.status_code == 200:
             # Javob sarlavhalaridan Content-Disposition ni olish
             content_disposition = r.headers.get('Content-Disposition')

@@ -131,7 +131,7 @@ async def process_photo(message: types.Message, state: FSMContext):
             'file': image_file,
         }
         data = {
-            'user': 122,
+            'user': 12,
             'book_id': book_id,
         }
         response = requests.post(API_ENDPOINT, files=files, data=data)
