@@ -70,7 +70,8 @@ async def process_abituriyent(message: types.Message):
 @dp.message_handler(lambda message: message.text == "🤵‍♂️ Prezident Maktabi")
 async def process_prezident_maktabi(message: types.Message):
     if await is_user_subscribed(message.from_user.id):
-        await message.answer("🤵‍♂️ Prezident Maktabi bo'limidasiz!\n\n🎑 Rasm yuboring.", reply_markup=back_button_keyboard)
+        await message.answer("🤵‍♂️ Prezident Maktabi bo'limidasiz!\n\n🎑 Rasm yuboring.",
+                             reply_markup=back_button_keyboard)
         user_context[message.from_user.id] = 'prezident_maktabi'
     else:
         await message.answer("❗️Botdan foydalanish uchun barcha kanallarga obuna bo'lishingiz kerak!",
